@@ -4,7 +4,7 @@ from pathlib import Path
 import locale
 
 # Definindo a localização para formatação
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+locale.setlocale(locale.LC_ALL, '')
 
 # Caminho para os datasets
 pasta_datasets = Path(__file__).parent.parent / 'datasets'
