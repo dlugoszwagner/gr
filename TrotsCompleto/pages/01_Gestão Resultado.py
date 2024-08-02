@@ -72,9 +72,10 @@ def merge_custo(df_vendas, df_tabelacusto):
     joined_df['VALOR_TOTAL_CUSTO'] = joined_df['VALOR_TOTAL_CUSTO'].fillna(0)  # Preencher valores NaN com 0
     return joined_df
 
-# Função para formatar valores em milhares sem casas decimais
 def formatar_milhar(valor):
-    return locale.format_string('%d', valor, grouping=True)
+    if pd.isna(valor):
+        return '0'
+    return f"{valor:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # Lendo os dados
 df_vendas = ler_vendas()
