@@ -4,11 +4,11 @@ from pathlib import Path
 import locale
 import os
 
-# Definindo a localização para formatação
-if os.name == 'nt':  # Se o sistema operacional for Windows
-    locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
-else:  # Para outros sistemas operacionais
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+# Tentando definir o locale
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error as e:
+    st.error(f"Locale error: {e}")
 
 # Caminho para os datasets
 pasta_datasets = Path(__file__).parent.parent / 'datasets'
@@ -73,9 +73,11 @@ def merge_custo(df_vendas, df_tabelacusto):
     joined_df['VALOR_TOTAL_CUSTO'] = joined_df['VALOR_TOTAL_CUSTO'].fillna(0)  # Preencher valores NaN com 0
     return joined_df
 
-# Função para formatar valores em milhares sem casas decimais
+# Função para formatação manual de valores
 def formatar_milhar(valor):
-    return locale.format_string('%d', valor, grouping=True)
+    if pd.isna(valor):
+        return '0'
+    return f"{valor:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # Lendo os dados
 df_vendas = ler_vendas()
@@ -157,7 +159,45 @@ totals = pd.DataFrame(totals).T
 totals.index = ['TOTAL']
 agrupar_vendedor = pd.concat([agrupar_vendedor, totals])
 
+# Calcular os totais após os filtros (certifique-se de que os totais estejam calculados)
+total_faturamento = joined_custo['VALOR'].sum()
+total_impostos = joined_custo['TOTALIMPOSTOS'].sum()
+total_faturamento_liquido = joined_custo['FATURAMENTOLIQ'].sum()
+total_custo_produto = joined_custo['VALOR_TOTAL_CUSTO'].sum()
+total_mc = joined_custo['MC'].sum()
+total_porcentagem = (total_mc / total_faturamento_liquido) * 100 if total_faturamento_liquido != 0 else 0
+
+# Criar um DataFrame somente com a linha de totais
+df_totais_01 = pd.DataFrame({
+  
+    'Faturamento': [total_faturamento],
+    'Total Impostos': [total_impostos],
+    'Faturamento Líquido': [total_faturamento_liquido]
+    
+})
+df_totais_02 = pd.DataFrame({
+    
+    'Custo Produto': [total_custo_produto],
+    'MC': [total_mc],
+    'Porcentagem': [total_porcentagem]
+})
+
+# Exibir o DataFrame de totais
+st.write("### Resumo")
+st.dataframe(df_totais_01.style.format({
+    'Faturamento': lambda x: f'R$ {formatar_milhar(x)}',
+    'Total Impostos': lambda x: f'R$ {formatar_milhar(x)}',
+    'Faturamento Líquido': lambda x: f'R$ {formatar_milhar(x)}'
+}))
+
+st.dataframe(df_totais_02.style.format({
+    'Custo Produto': lambda x: f'R$ {formatar_milhar(x)}',
+    'MC': lambda x: f'R$ {formatar_milhar(x)}',
+    'Porcentagem': '{:.2f}%'
+}))
+
 # Formatar e exibir o DataFrame
+st.write("### Por Representante")
 df_styled = agrupar_vendedor.style.format({
     'FATURAMENTO': lambda x: f'R$ {formatar_milhar(x)}',
     'ICMS': lambda x: f'R$ {formatar_milhar(x)}',
@@ -174,6 +214,8 @@ df_styled = agrupar_vendedor.style.format({
 
 st.write(df_styled)
 
+
+st.write("### Por Produtos")
 # Adicionar seleção de vendedor
 vendedores = ['Todos'] + agrupar_vendedor.index[:-1].tolist()  # Adiciona 'Todos' na lista de vendedores
 vendedor_selecionado = st.selectbox('Selecione o Vendedor para detalhes:', vendedores)
