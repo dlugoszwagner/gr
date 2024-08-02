@@ -2,9 +2,13 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import locale
+import os
 
 # Definindo a localização para formatação
-locale.setlocale(locale.LC_ALL, '')
+if os.name == 'nt':  # Se o sistema operacional for Windows
+    locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
+else:  # Para outros sistemas operacionais
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 # Caminho para os datasets
 pasta_datasets = Path(__file__).parent.parent / 'datasets'
@@ -39,9 +43,9 @@ def ler_impostos():
         encoding='latin-1', 
         parse_dates=True, 
         sep=';', 
-        usecols=['NUMERO', 'CODIGO', 'VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']
+        usecols=['NUMERO', 'CODIGO', 'VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']
     )
-    df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']] = df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']].replace(',', '.', regex=True).astype(float)
+    df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']] = df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']].replace(',', '.', regex=True).astype(float)
     return df_impostos
 
 # Função para filtrar vendas
@@ -59,30 +63,37 @@ def merge_vendas_impostos(df_vendas, df_impostos):
         right_on=['NUMERO', 'CODIGO'], 
         how='left'
     )
-    merged_df[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']] = merged_df[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']].fillna(0)
+    merged_df[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']] = merged_df[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']].fillna(0)
     return merged_df
 
 # Função para fazer o merge dos dataframes de vendas e custo
 def merge_custo(df_vendas, df_tabelacusto):
     joined_df = pd.merge(df_vendas, df_tabelacusto, on='CODPRODUTO', how='left')
     joined_df['VALOR_TOTAL_CUSTO'] = joined_df['UNI'] * joined_df['VALORCUSTO']
+    joined_df['VALOR_TOTAL_CUSTO'] = joined_df['VALOR_TOTAL_CUSTO'].fillna(0)  # Preencher valores NaN com 0
     return joined_df
 
-# Função para formatar valores em milhares
+# Função para formatar valores em milhares sem casas decimais
 def formatar_milhar(valor):
-    return locale.format_string('%.2f', valor, grouping=True)
+    return locale.format_string('%d', valor, grouping=True)
 
 # Lendo os dados
 df_vendas = ler_vendas()
 df_tabelacusto = ler_custo()
 df_impostos = ler_impostos()
 
-# Convertendo as colunas CODPRODUTO e CODNOTAFISCAL para string em ambos os DataFrames
+# Convertendo as colunas CODPRODUTO e CODNOTAFISCAL para string
 df_vendas['CODPRODUTO'] = df_vendas['CODPRODUTO'].astype(str)
 df_vendas['CODNOTAFISCAL'] = df_vendas['CODNOTAFISCAL'].astype(str)
 df_tabelacusto['CODPRODUTO'] = df_tabelacusto['CODPRODUTO'].astype(str)
 df_impostos['CODIGO'] = df_impostos['CODIGO'].astype(str)
 df_impostos['NUMERO'] = df_impostos['NUMERO'].astype(str)
+
+# Convertendo colunas para tipos numéricos
+df_vendas['UNI'] = pd.to_numeric(df_vendas['UNI'], errors='coerce')
+df_vendas['VALOR'] = pd.to_numeric(df_vendas['VALOR'], errors='coerce')
+df_tabelacusto['VALORCUSTO'] = pd.to_numeric(df_tabelacusto['VALORCUSTO'], errors='coerce')
+df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']] = df_impostos[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']].apply(pd.to_numeric, errors='coerce')
 
 # Filtrando os dados de vendas
 df_vendas_fil = filtrar_vendas(df_vendas)
@@ -108,7 +119,7 @@ joined_vendas_impostos = merge_vendas_impostos(df_vendas_fil, df_impostos)
 joined_custo = merge_custo(joined_vendas_impostos, df_tabelacusto)
 
 # Criar a coluna TOTALIMPOSTOS
-joined_custo['TOTALIMPOSTOS'] = joined_custo[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS']].sum(axis=1)
+joined_custo['TOTALIMPOSTOS'] = joined_custo[['VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST']].sum(axis=1)
 
 # Criar a coluna FATURAMENTOLIQ
 joined_custo['FATURAMENTOLIQ'] = joined_custo['VALOR'] - joined_custo['TOTALIMPOSTOS']
@@ -117,7 +128,7 @@ joined_custo['FATURAMENTOLIQ'] = joined_custo['VALOR'] - joined_custo['TOTALIMPO
 joined_custo['MC'] = joined_custo['FATURAMENTOLIQ'] - joined_custo['VALOR_TOTAL_CUSTO']
 
 # Agrupar por vendedor e somar as colunas necessárias
-agrupar_vendedor = joined_custo.groupby('NOMEVENDEDOR')[['VALOR', 'VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'DESCONTOS', 'TOTALIMPOSTOS', 'VALOR_TOTAL_CUSTO', 'FATURAMENTOLIQ', 'MC']].sum()
+agrupar_vendedor = joined_custo.groupby('NOMEVENDEDOR')[['VALOR', 'VALORICMS', 'VALORIPI', 'VALORPIS', 'VALORCOFINS', 'VALORICMSST', 'TOTALIMPOSTOS', 'VALOR_TOTAL_CUSTO', 'FATURAMENTOLIQ', 'MC']].sum()
 
 # Criar coluna de porcentagem
 agrupar_vendedor['PORCENTAGEM'] = (agrupar_vendedor['MC'] / agrupar_vendedor['FATURAMENTOLIQ']) * 100
@@ -130,7 +141,6 @@ agrupar_vendedor = agrupar_vendedor.rename(columns={
     'VALORPIS': 'PIS',
     'VALORCOFINS': 'COFINS',
     'VALORICMSST': 'ICMSST',
-    'DESCONTOS': 'DESCONTOS',
     'FATURAMENTOLIQ': 'FATURAMENTO LIQ',
     'VALOR_TOTAL_CUSTO': 'CUSTO PRODUTO',
     'MC': 'MC',
@@ -138,51 +148,61 @@ agrupar_vendedor = agrupar_vendedor.rename(columns={
 })
 
 # Reordenar colunas
-agrupar_vendedor = agrupar_vendedor[['FATURAMENTO', 'ICMS', 'IPI', 'PIS', 'COFINS', 'ICMSST', 'DESCONTOS', 'TOTAL IMPOSTOS', 'FATURAMENTO LIQ', 'CUSTO PRODUTO', 'MC', 'PORCENTAGEM']]
+agrupar_vendedor = agrupar_vendedor[['FATURAMENTO', 'ICMS', 'IPI', 'PIS', 'COFINS', 'ICMSST', 'TOTAL IMPOSTOS', 'FATURAMENTO LIQ', 'CUSTO PRODUTO', 'MC', 'PORCENTAGEM']]
 
 # Adicionar linha de totais
-totals = agrupar_vendedor[['FATURAMENTO', 'ICMS', 'IPI', 'PIS', 'COFINS', 'ICMSST', 'DESCONTOS', 'TOTAL IMPOSTOS', 'FATURAMENTO LIQ', 'CUSTO PRODUTO', 'MC']].sum()
+totals = agrupar_vendedor[['FATURAMENTO', 'ICMS', 'IPI', 'PIS', 'COFINS', 'ICMSST', 'TOTAL IMPOSTOS', 'FATURAMENTO LIQ', 'CUSTO PRODUTO', 'MC']].sum()
 totals['PORCENTAGEM'] = (totals['MC'] / totals['FATURAMENTO LIQ']) * 100
 totals = pd.DataFrame(totals).T
 totals.index = ['TOTAL']
 agrupar_vendedor = pd.concat([agrupar_vendedor, totals])
 
-# Destaque dos totais em colunas lado a lado com tamanho menor, 4 por linha
-st.write("### Totais")
-col1, col2, col3, col4 = st.columns(4)
-col1.markdown(f"<h5>Faturamento</h5><p style='font-size:16px'>{formatar_milhar(totals['FATURAMENTO'][0])} R$</p>", unsafe_allow_html=True)
-col2.markdown(f"<h5>ICMS</h5><p style='font-size:16px'>{formatar_milhar(totals['ICMS'][0])} R$</p>", unsafe_allow_html=True)
-col3.markdown(f"<h5>IPI</h5><p style='font-size:16px'>{formatar_milhar(totals['IPI'][0])} R$</p>", unsafe_allow_html=True)
-col4.markdown(f"<h5>PIS</h5><p style='font-size:16px'>{formatar_milhar(totals['PIS'][0])} R$</p>", unsafe_allow_html=True)
-
-col5, col6, col7, col8 = st.columns(4)
-col5.markdown(f"<h5>COFINS</h5><p style='font-size:16px'>{formatar_milhar(totals['COFINS'][0])} R$</p>", unsafe_allow_html=True)
-col6.markdown(f"<h5>ICMSST</h5><p style='font-size:16px'>{formatar_milhar(totals['ICMSST'][0])} R$</p>", unsafe_allow_html=True)
-col7.markdown(f"<h5>DESCONTOS</h5><p style='font-size:16px'>{formatar_milhar(totals['DESCONTOS'][0])} R$</p>", unsafe_allow_html=True)
-col8.markdown(f"<h5>Total Impostos</h5><p style='font-size:16px'>{formatar_milhar(totals['TOTAL IMPOSTOS'][0])} R$</p>", unsafe_allow_html=True)
-
-col9, col10, col11, col12 = st.columns(4)
-col9.markdown(f"<h5>Custo Produto</h5><p style='font-size:16px'>{formatar_milhar(totals['CUSTO PRODUTO'][0])} R$</p>", unsafe_allow_html=True)
-col10.markdown(f"<h5>Faturamento Líquido</h5><p style='font-size:16px'>{formatar_milhar(totals['FATURAMENTO LIQ'][0])} R$</p>", unsafe_allow_html=True)
-col11.markdown(f"<h5>MC</h5><p style='font-size:16px'>{formatar_milhar(totals['MC'][0])} R$</p>", unsafe_allow_html=True)
-
-col13 = st.columns(1)
-col13[0].markdown(f"<h5>Margem %</h5><p style='font-size:16px'>{totals['PORCENTAGEM'][0]:.2f}%</p>", unsafe_allow_html=True)
-
 # Formatar e exibir o DataFrame
 df_styled = agrupar_vendedor.style.format({
-    'FATURAMENTO': lambda x: formatar_milhar(x) + ' R$',
-    'ICMS': lambda x: formatar_milhar(x) + ' R$',
-    'IPI': lambda x: formatar_milhar(x) + ' R$',
-    'PIS': lambda x: formatar_milhar(x) + ' R$',
-    'COFINS': lambda x: formatar_milhar(x) + ' R$',
-    'ICMSST': lambda x: formatar_milhar(x) + ' R$',
-    'DESCONTOS': lambda x: formatar_milhar(x) + ' R$',
-    'TOTAL IMPOSTOS': lambda x: formatar_milhar(x) + ' R$',
-    'FATURAMENTO LIQ': lambda x: formatar_milhar(x) + ' R$',
-    'CUSTO PRODUTO': lambda x: formatar_milhar(x) + ' R$',
-    'MC': lambda x: formatar_milhar(x) + ' R$',
+    'FATURAMENTO': lambda x: f'R$ {formatar_milhar(x)}',
+    'ICMS': lambda x: f'R$ {formatar_milhar(x)}',
+    'IPI': lambda x: f'R$ {formatar_milhar(x)}',
+    'PIS': lambda x: f'R$ {formatar_milhar(x)}',
+    'COFINS': lambda x: f'R$ {formatar_milhar(x)}',
+    'ICMSST': lambda x: f'R$ {formatar_milhar(x)}',
+    'TOTAL IMPOSTOS': lambda x: f'R$ {formatar_milhar(x)}',
+    'FATURAMENTO LIQ': lambda x: f'R$ {formatar_milhar(x)}',
+    'CUSTO PRODUTO': lambda x: f'R$ {formatar_milhar(x)}',
+    'MC': lambda x: f'R$ {formatar_milhar(x)}', 
     'PORCENTAGEM': '{:.2f}%'
 }).set_properties(**{'width': '120px'})
 
 st.write(df_styled)
+
+# Adicionar seleção de vendedor
+vendedores = ['Todos'] + agrupar_vendedor.index[:-1].tolist()  # Adiciona 'Todos' na lista de vendedores
+vendedor_selecionado = st.selectbox('Selecione o Vendedor para detalhes:', vendedores)
+
+# Filtrar detalhes das vendas para o vendedor selecionado
+if vendedor_selecionado and vendedor_selecionado != 'Todos':
+    detalhes_vendas = df_vendas_fil[df_vendas_fil['NOMEVENDEDOR'] == vendedor_selecionado]
+else:
+    detalhes_vendas = df_vendas_fil
+
+# Agrupar por DESCPRODUTO
+detalhes_agregados = detalhes_vendas.groupby('DESCPRODUTO').agg({
+    'UNI': 'sum',
+    'VALOR': 'sum'
+}).reset_index()
+
+# Adicionar linha de totais
+totals = detalhes_agregados[['UNI', 'VALOR']].sum()
+totals['DESCPRODUTO'] = 'TOTAL GERAL'
+
+# Criar um DataFrame para a linha de totais
+totals_df = pd.DataFrame([totals])
+
+# Concatenar com o DataFrame existente
+detalhes_agregados = pd.concat([detalhes_agregados, totals_df], ignore_index=True)
+
+# Exibindo detalhes agregados com linha de totais
+st.write('**Detalhes Agregados por Produto**')
+st.dataframe(detalhes_agregados.style.format({
+    'VALOR': lambda x: f'R$ {formatar_milhar(x)}',
+    'UNI': '{:.0f}',
+}))
