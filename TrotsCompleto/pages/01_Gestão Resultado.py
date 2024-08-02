@@ -4,11 +4,10 @@ from pathlib import Path
 import locale
 import os
 
-# Definindo a localização para formatação
-if os.name == 'nt':  # Se o sistema operacional for Windows
-    locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
-else:  # Para outros sistemas operacionais
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error as e:
+    st.error(f"Locale error: {e}")
 
 # Caminho para os datasets
 pasta_datasets = Path(__file__).parent.parent / 'datasets'
