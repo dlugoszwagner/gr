@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import locale
 import os
+import numpy as np
 
 # Tentando definir o locale
 try:
@@ -89,8 +90,8 @@ df_tabelacusto = ler_custo()
 df_impostos = ler_impostos()
 
 # Convertendo as colunas CODPRODUTO e CODNOTAFISCAL para string
-df_vendas['CODPRODUTO'] = df_vendas['CODPRODUTO'].astype(str)
-df_vendas['CODNOTAFISCAL'] = df_vendas['CODNOTAFISCAL'].astype(str)
+df_vendas['CODPRODUTO'] = df_vendas['CODPRODUTO'].fillna(0).replace([np.inf, -np.inf], 0).astype(int).astype(str)
+df_vendas['CODNOTAFISCAL'] = df_vendas['CODNOTAFISCAL'].fillna(0).replace([np.inf, -np.inf], 0).astype(int).astype(str)
 df_tabelacusto['CODPRODUTO'] = df_tabelacusto['CODPRODUTO'].astype(str)
 df_impostos['CODIGO'] = df_impostos['CODIGO'].astype(str)
 df_impostos['NUMERO'] = df_impostos['NUMERO'].astype(str)
