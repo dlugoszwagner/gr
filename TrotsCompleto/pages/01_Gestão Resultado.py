@@ -11,17 +11,21 @@ except locale.Error as e:
     st.error(f"Locale error: {e}")
 
 # Caminho para os datasets
-pasta_datasets = Path(__file__).parent.parent / 'datasets'
+pasta_datasets = Path(__file__).parent.parent / 'pages' 
 
 # Função para ler o arquivo CSV de vendas
 def ler_vendas():
-    return pd.read_csv(
-        pasta_datasets / 'sale.csv', 
-        encoding='latin-1', 
-        parse_dates=True, 
-        sep=';', 
-        usecols=['ANOVENDA', 'MESVENDA', 'TIPOVENDA', 'NOMEVENDEDOR', 'CODPRODUTO', 'DESCPRODUTO', 'UNI', 'VALOR', 'CODNOTAFISCAL']
-    )
+    try:
+        return pd.read_csv(
+            pasta_datasets / 'dados_vendas.csv',
+            encoding='latin-1',
+            parse_dates=True,
+            sep=',',
+            on_bad_lines='warn'  # Pandas >= 1.3.0
+        )
+    except pd.errors.ParserError as e:
+        st.error(f"Parser error: {e}")
+        return pd.DataFrame()  # Retorna um DataFrame vazio em caso de erro
 
 # Função para ler o arquivo CSV de custo
 def ler_custo():

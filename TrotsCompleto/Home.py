@@ -4,5 +4,5 @@ from pathlib import Path
 import locale
 import os
 
-st.write("### Versão 1.1.2")
+st.write("### Versão 1.2 - 07.08.24")
 
