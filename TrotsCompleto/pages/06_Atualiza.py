@@ -20,11 +20,13 @@ pasta_datasets = Path(__file__).parent / 'datasets'
 def conectar_mysql():
     try:
         connection = mysql.connector.connect(
-             host='Servidor',
+            # host='Servidor',
+            host='trots.nsupdate.info',
             database='comercio',
             user='Trots2303',
             password='Trots2303#2024',
-            port=3306,
+            # port=3306,
+            port=3324,
             charset='utf8'
         )
         if connection.is_connected():
